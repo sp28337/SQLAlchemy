@@ -13,4 +13,5 @@ print(f'{'\n [!]  '}{compiled.params}{'\n'}')
 with engine.connect() as conn:
     result = conn.execute(stmt)
     print(f'{'\n [!]  '}{result}{'\n'}')
-    conn.commit()
+    print(result.inserted_primary_key)  # Row object (named tuple)
+    # conn.commit()
