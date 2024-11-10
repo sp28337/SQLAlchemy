@@ -32,5 +32,4 @@ address_table = Table(
     Column("email_address", String, nullable=False),
 )
 
-
-#Base.metadata.create_all(get_db_engine())
+# Base.metadata.create_all(get_db_engine())
