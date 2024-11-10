@@ -28,4 +28,4 @@ class Address(ORMBase):
         return f"Address(id={self.id!r}, email_address={self.email_address!r})"
 
 
-ORMBase.metadata.create_all(engine)
+# ORMBase.metadata.create_all(engine)
