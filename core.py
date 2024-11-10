@@ -1,17 +1,20 @@
 from sqlalchemy import insert
 
 from core_models import *
-from database import engine
+from database import get_db_engine
 
+# print()
+# print(insert(user_table))
+# print()
 
-stmt = insert(user_table).values(name="spongebob", fullname="Spongebob Squarepants")
-print(f'{'\n [!]  '}{stmt}{'\n'}')
-compiled = stmt.compile()
-print(f'{'\n [!]  '}{compiled.params}{'\n'}')
-
-
-with engine.connect() as conn:
-    result = conn.execute(stmt)
-    print(f'{'\n [!]  '}{result}{'\n'}')
-    print(result.inserted_primary_key)  # Row object (named tuple)
+with get_db_engine().connect() as conn:
+    result = conn.execute(
+        insert(user_table),
+        [
+            {"name": "sandy", "fullname": "Sandy Cheeks"},
+            {"name": "patrick", "fullname": "Patrick Star"},
+        ],
+    )
     # conn.commit()
+
+
