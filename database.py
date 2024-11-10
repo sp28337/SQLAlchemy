@@ -8,5 +8,9 @@ class Base(DeclarativeBase):
     pass
 
 
+class ORMBase(DeclarativeBase):
+    pass
+
+
 def get_db_engine():
     return engine
