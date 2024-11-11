@@ -1,23 +1,58 @@
-from sqlalchemy import select
-from sqlalchemy.orm import aliased
+from sqlalchemy import select, func
 
+from core_models import address_table, user_table
 from database import get_db_engine
-from orm_models import Address, User
 
 engine = get_db_engine()
 
 
-# Эквивалентом ORM метода FromClause.alias() является функция ORM aliased(), которая может быть применена к сущности,
-# такой как User и Address. Это создает Alias объект внутри, который находится против исходного сопоставленного
-# Table объекта, сохраняя при этом функциональность ORM. SELECT ниже выбирает из User сущности все объекты,
-# которые включают два конкретных адреса электронной почты:
+# Подзапрос в SQL — это оператор SELECT, заключенный в скобки и помещенный в контекст внешнего оператора,
+# обычно оператора SELECT, но не обязательно.
+#
+# В этом разделе мы рассмотрим так называемый «нескалярный» подзапрос, который обычно помещается в предложение FROM
+# включающего SELECT. Мы также рассмотрим Common Table Expression или CTE, который используется аналогично подзапросу,
+# но включает дополнительные функции.
+#
+# SQLAlchemy использует Subquery объект для представления подзапроса, а CTE для представления CTE,
+# обычно получаемого из методов Select.subquery() и Select.cte() соответственно. Любой из объектов
+# может использоваться как элемент FROM внутри более крупной select() конструкции.
+#
+# Мы можем построить Subquery, который будет выбирать совокупное количество строк из address таблицы
+# (агрегатные функции и GROUP BY были представлены ранее)
 
-address_alias_1 = aliased(Address)
-address_alias_2 = aliased(Address)
-print(
-    select(User)
-    .join_from(User, address_alias_1)
-    .where(address_alias_1.email_address == "patrick@aol.com")
-    .join_from(User, address_alias_2)
-    .where(address_alias_2.email_address == "patrick@gmail.com")
+subq = (
+    select(func.count(address_table.c.id).label("count"), address_table.c.user_id)
+    .group_by(address_table.c.user_id)
+    .subquery()
 )
+
+# Строковая интерпретация подзапроса без его встраивания в другой Select или другой оператора
+# создает простой оператор SELECT без каких-либо закрывающих скобок:
+
+print(subq)
+
+print("-" * 60)
+# Объект Subqueryведет себя как любой другой объект FROM, такой как Table, в частности, он включает Subquery.c
+# пространство имен столбцов, которые он выбирает. Мы можем использовать это пространство имен для ссылки
+# как на user_id столбец, так и на наше пользовательское маркированное count выражение:
+
+print(select(subq.c.user_id, subq.c.count))
+
+print("-" * 60)
+# Выбрав строки, содержащиеся в subq объекте, мы можем применить объект к большему объекту Select,
+# который объединит данные в user_account таблицу:
+
+stmt = select(
+    user_table.c.name,
+    user_table.c.fullname,
+    subq.c.count
+).join_from(user_table, subq)
+
+print(stmt)
+
+# Для соединения из user_account в address мы использовали метод Select.join_from(). Как было показано ранее,
+# предложение ON этого соединения снова было выведено на основе ограничений внешнего ключа. Даже если подзапрос SQL
+# сам по себе не имеет никаких ограничений, SQLAlchemy может действовать на ограничениях, представленных в столбцах,
+# определяя, что subq.c.user_id столбец получен из address_table.c.user_id столбца, который выражает связь
+# внешнего ключа обратно к user_table.c.id столбцу, который затем используется для генерации предложения ON.
+
