@@ -1,25 +1,24 @@
-from sqlalchemy import insert, select, bindparam
+from sqlalchemy import JSON, select
+from sqlalchemy import type_coerce
+from sqlalchemy.dialects import mysql
+import json
 
-from core_models import *
-from database import get_db_engine
+# Иногда необходимо, чтобы SQLAlchemy знал тип данных выражения, по всем указанным выше причинам, но не отображал
+# само выражение CAST на стороне SQL, где оно может помешать операции SQL, которая уже работает без него.
+# Для этого довольно распространенного варианта использования есть другая функция, type_coerce() которая тесно
+# связана с cast(), в том смысле, что она устанавливает выражение Python как имеющее определенный тип базы данных SQL,
+# но не отображает CAST ключевое слово или тип данных на стороне базы данных. type_coerce() особенно важно при
+# работе с JSON типом данных, который обычно имеет сложную связь со строковыми типами данных на разных платформах и
+# может даже не быть явным типом данных, например, на SQLite и MariaDB. Ниже мы используем type_coerce() для передачи
+# структуры Python в виде строки JSON в одну из функций JSON MySQL:
 
-engine = get_db_engine()
+from sqlalchemy import JSON
+from sqlalchemy import type_coerce
+from sqlalchemy.dialects import mysql
+s = select(type_coerce({"some_key": {"foo": "bar"}}, JSON)["some_key"])
+print(s.compile(dialect=mysql.dialect()))
 
-insert_stmt = insert(address_table).returning(
-    address_table.c.id, address_table.c.email_address
-)
-print(insert_stmt)
-
-# Его также можно комбинировать с Insert.from_select(),
-# как в примере ниже, который основан на примере, указанном в INSERT…FROM SELECT
-#                                |
-#                                V
-# ------------------------------------------------------------------------
-# Эта конструкция используется, когда требуется скопировать данные из какой-то другой части базы данных
-# непосредственно в новый набор строк, без фактического извлечения и повторной отправки данных от клиента.
-print('-----------------------------------------------------------------------')
-select_stmt = select(user_table.c.id, user_table.c.name + "@aol.com")
-insert_stmt = insert(address_table).from_select(
-    ["user_id", "email_address"], select_stmt
-)
-print(insert_stmt)
+# JSON_EXTRACT Выше была вызвана функция SQL MySQL, поскольку мы использовали type_coerce() ее для указания того,
+# что наш словарь Python следует рассматривать как JSON. В этом случае __getitem__ оператор Python ['some_key']
+# стал доступен в результате и позволил отобразить JSON_EXTRACT выражение пути
+# (не показано, однако в этом случае это в конечном итоге будет '$."some_key"').

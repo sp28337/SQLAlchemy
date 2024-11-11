@@ -1,12 +1,12 @@
 from typing import List
 from typing import Optional
-from database import Base
+from database import ORMBase
 from sqlalchemy import String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import engine
 
 
-class User(Base):
+class User(ORMBase):
     __tablename__ = "user_account"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30))
@@ -17,7 +17,7 @@ class User(Base):
         return f"User(id={self.id!r}, name={self.name!r}, fullname={self.fullname!r})"
 
 
-class Address(Base):
+class Address(ORMBase):
     __tablename__ = "address"
     id: Mapped[int] = mapped_column(primary_key=True)
     email_address: Mapped[str]
@@ -28,4 +28,4 @@ class Address(Base):
         return f"Address(id={self.id!r}, email_address={self.email_address!r})"
 
 
-Base.metadata.create_all(engine)
+# ORMBase.metadata.create_all(engine)
