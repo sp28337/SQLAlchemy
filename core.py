@@ -1,45 +1,24 @@
-from sqlalchemy import update, bindparam
+from sqlalchemy import update, select
 
-from core_models import user_table
+from core_models import user_table, address_table
 from database import get_db_engine
 
 engine = get_db_engine()
 
 
-# Базовое ОБНОВЛЕНИЕ выглядит так:
+# Оператор UPDATE может использовать строки в других таблицах с помощью коррелированного подзапроса.
+# Подзапрос может использоваться в любом месте, где может быть размещено выражение столбца:
 
-stmt = (
-    update(user_table)
-    .where(user_table.c.name == "patrick")
-    .values(fullname="Patrick the Star")
+scalar_subq = (
+    select(address_table.c.email_address)
+    .where(address_table.c.user_id == user_table.c.id)
+    .order_by(address_table.c.id)
+    .limit(1)
+    .scalar_subquery()
 )
-print(stmt)
-
-# Метод Update.values() управляет содержимым элементов SET оператора UPDATE. Это тот же метод, который используется
-# конструкцией Insert. Параметры обычно можно передавать с использованием имен столбцов в качестве ключевых аргументов.
-print("-" * 60)
-# UPDATE поддерживает все основные формы SQL UPDATE, включая обновления по выражениям,
-# где мы можем использовать Column выражения:
-
-stmt = update(user_table).values(fullname="Username: " + user_table.c.name)
-print(stmt)
+print(scalar_subq)
 
 print("-" * 60)
-# Для поддержки UPDATE в контексте «executemany», где для одного и того же оператора будет вызываться множество
-# наборов параметров, bindparam() можно использовать конструкцию для настройки связанных параметров;
-# они заменяют места, где обычно располагаются литеральные значения:
 
-stmt = (
-    update(user_table)
-    .where(user_table.c.name == bindparam("oldname"))
-    .values(name=bindparam("newname"))
-)
-with engine.begin() as conn:
-    conn.execute(
-        stmt,
-        [
-            {"oldname": "jack", "newname": "ed"},
-            {"oldname": "wendy", "newname": "mary"},
-            {"oldname": "jim", "newname": "jake"},
-        ],
-    )
+update_stmt = update(user_table).values(fullname=scalar_subq)
+print(update_stmt)
