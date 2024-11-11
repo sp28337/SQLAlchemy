@@ -1,21 +1,20 @@
-from sqlalchemy import select
+from sqlalchemy import select, text, literal_column
 
 from core_models import *
-from database import get_db_engine, get_db_session
-from orm_models import User, Address
+from database import get_db_engine
 
 engine = get_db_engine()
 
+stmt = select(text("'test'"), user_table.c.name).group_by(user_table.c.name)
 
-with get_db_session() as session:
+with engine.connect() as conn:
+    print(conn.execute(stmt).all())
 
-    # Метод ColumnElement.label(), а также одноименный метод, доступный в атрибутах ORM, предоставляет label
-    # SQL столбца или выражения, позволяя ему иметь определенное имя в результирующем наборе.
-    # Это может быть полезно при ссылке на произвольные выражения SQL в строке результата по имени:
+print("-" * 60)
 
-    stmt = select(
-        ("Username: " + user_table.c.name).label("username"),
-    ).order_by(user_table.c.name)
-    with engine.connect() as conn:
-        for row in conn.execute(stmt):
-            print(f"{row.username}")
+stmt = select(literal_column("'some phrase'").label("p"), user_table.c.name).order_by(
+    user_table.c.name)
+
+with engine.connect() as conn:
+    for row in conn.execute(stmt):
+        print(f"{row.p}, {row.name}")
