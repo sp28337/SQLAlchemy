@@ -1,25 +1,23 @@
 from sqlalchemy import select
+from sqlalchemy.orm import aliased
 
-from core_models import user_table
 from database import get_db_engine
+from orm_models import Address, User
 
 engine = get_db_engine()
 
 
-# Теперь, когда мы выбираем из нескольких таблиц и используем соединения, мы быстро сталкиваемся со случаем,
-# когда нам нужно ссылаться на одну и ту же таблицу несколько раз в предложении FROM оператора.
-# Мы делаем это с помощью псевдонимов SQL , которые представляют собой синтаксис, предоставляющий
-# альтернативное имя таблице или подзапросу, из которого на него можно ссылаться в операторе.
-#
-# В языке выражений SQLAlchemy эти «имена» представлены FromClause объектами, известными как Alias,
-# которые создаются в Core с помощью FromClause.alias() метода. Alias похож на Table тем,
-# что у него также есть пространство имен Column объектов в Alias.c.collection.
-# Например, оператор SELECT ниже возвращает все уникальные пары имен пользователей:
+# Эквивалентом ORM метода FromClause.alias() является функция ORM aliased(), которая может быть применена к сущности,
+# такой как User и Address. Это создает Alias объект внутри, который находится против исходного сопоставленного
+# Table объекта, сохраняя при этом функциональность ORM. SELECT ниже выбирает из User сущности все объекты,
+# которые включают два конкретных адреса электронной почты:
 
-user_alias_1 = user_table.alias()
-user_alias_2 = user_table.alias()
+address_alias_1 = aliased(Address)
+address_alias_2 = aliased(Address)
 print(
-    select(user_alias_1.c.name, user_alias_2.c.name).join_from(
-        user_alias_1, user_alias_2, user_alias_1.c.id > user_alias_2.c.id
-    )
+    select(User)
+    .join_from(User, address_alias_1)
+    .where(address_alias_1.email_address == "patrick@aol.com")
+    .join_from(User, address_alias_2)
+    .where(address_alias_2.email_address == "patrick@gmail.com")
 )
