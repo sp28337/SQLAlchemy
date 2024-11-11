@@ -1,41 +1,40 @@
-from sqlalchemy import select
-from sqlalchemy.orm import aliased
-from database import get_db_session
-from orm_models import Address, User
+from sqlalchemy import select, union_all
 
+from core_models import address_table, user_table
+from database import get_db_engine
 
-# В ORM aliased() конструкция может использоваться для связывания сущности ORM, такой как наш User или Address класс,
-# с любой FromClause концепцией, которая представляет источник строк. Предыдущий раздел Псевдонимы сущностей ORM
-# иллюстрирует использование aliased() для связывания сопоставленного класса с Alias его сопоставленным Table.
-# Здесь мы иллюстрируем aliased() выполнение того же действия как против , Subquery так и CTE против
-# сгенерированного против Select конструкции, которая в конечном итоге выводится из того же сопоставленного Table.
+engine = get_db_engine()
+
+# В SQL операторы SELECT могут быть объединены вместе с помощью операции UNION или UNION ALL SQL,
+# которая создает набор всех строк, созданных одним или несколькими операторами вместе.
+# Также возможны другие операции над множествами, такие как INTERSECT [ALL] и EXCEPT [ALL].
 #
-# Ниже приведен пример применения aliased() к Subquery конструкции, чтобы сущности ORM могли быть извлечены из ее строк.
-# Результат показывает ряд объектов User и Address, где данные для каждого Address объекта в конечном итоге были
-# получены из подзапроса к address таблице, а не из этой таблицы напрямую:
+# Конструкция SQLAlchemy Select поддерживает композиции такого рода с использованием таких функций,
+# как union(), intersect() и except_(), а также «всех» аналогов union_all(), intersect_all() и except_all().
+# Все эти функции принимают произвольное количество подвыбираемых элементов, которые обычно являются
+# Select конструкциями, но также могут быть существующей композицией.
+#
+# Конструкция, созданная этими функциями, — это CompoundSelect, которая используется таким же образом,
+# как и Select конструкция, за исключением того, что у нее меньше методов. CompoundSelect Созданная,
+# union_all() например, может быть вызвана напрямую с помощью Connection.execute():
 
-subq = select(Address).where(~Address.email_address.like("%@aol.com")).subquery()
-address_subq = aliased(Address, subq)
+stmt1 = select(user_table).where(user_table.c.name == "sandy")
+stmt2 = select(user_table).where(user_table.c.name == "spongebob")
+u = union_all(stmt1, stmt2)
+with engine.connect() as conn:
+    result = conn.execute(u)
+    print(result.all())
+
+print("---" * 20)
+# Чтобы использовать CompoundSelect в качестве подзапроса, как и в Select случае с SelectBase.subquery() методом,
+# который создаст Subquery объект с FromClause.c коллекцией, на которую можно ссылаться во вложенном select():
+
+u_subq = u.subquery()
 stmt = (
-    select(User, address_subq)
-    .join_from(User, address_subq)
-    .order_by(User.id, address_subq.id)
+    select(u_subq.c.name, address_table.c.email_address)
+    .join_from(address_table, u_subq)
+    .order_by(u_subq.c.name, address_table.c.email_address)
 )
-with get_db_session() as session:
-    for user, address in session.execute(stmt):
-        print(f"{user} {address}")
-
-print("-" * 60)
-# Далее следует еще один пример, который абсолютно такой же, за исключением того,
-# что вместо этого используется конструкция CTE:
-
-cte_obj = select(Address).where(~Address.email_address.like("%@aol.com")).cte()
-address_cte = aliased(Address, cte_obj)
-stmt = (
-    select(User, address_cte)
-    .join_from(User, address_cte)
-    .order_by(User.id, address_cte.id)
-)
-with get_db_session() as session:
-    for user, address in session.execute(stmt):
-        print(f"{user} {address}")
+with engine.connect() as conn:
+    result = conn.execute(stmt)
+    print(result.all())
