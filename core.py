@@ -1,18 +1,29 @@
-from sqlalchemy import update
+from sqlalchemy import update, delete
 
 from core_models import user_table
 from database import get_db_engine
 
 engine = get_db_engine()
 
-# Оба Update и Delete поддерживают возможность возвращать количество сопоставленных строк после выполнения оператора
-# для операторов, которые вызываются с помощью Core Connection, т. е Connection.execute(). Согласно указанным ниже
-# предостережениям, это значение доступно из CursorResult.rowcount атрибута:
+# Как и Insert конструкция, Updateа Delete также поддерживают предложение RETURNING, которое добавляется с помощью
+# методов Update.returning() и Delete.returning(). Когда эти методы используются на бэкэнде, поддерживающем RETURNING,
+# выбранные столбцы из всех строк, которые соответствуют критериям WHERE оператора,
+# будут возвращены в Result объекте как строки, которые можно итерировать:
 
-with engine.begin() as conn:
-    result = conn.execute(
-        update(user_table)
-        .values(fullname="Patrick McStar")
-        .where(user_table.c.name == "patrick")
-    )
-    print(result.rowcount)
+update_stmt = (
+    update(user_table)
+    .where(user_table.c.name == "patrick")
+    .values(fullname="Patrick the Star")
+    .returning(user_table.c.id, user_table.c.name)
+)
+
+print(update_stmt)
+
+
+delete_stmt = (
+    delete(user_table)
+    .where(user_table.c.name == "patrick")
+    .returning(user_table.c.id, user_table.c.name)
+)
+
+print(delete_stmt)
