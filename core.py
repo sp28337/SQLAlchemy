@@ -1,22 +1,25 @@
-from sqlalchemy import select, func, desc
+from sqlalchemy import select
 
+from core_models import user_table
 from database import get_db_engine
-from orm_models import Address
 
 engine = get_db_engine()
 
 
-# Важной методикой, в частности, в некоторых бэкэндах баз данных, является возможность ORDER BY или GROUP BY выражения,
-# которое уже указано в предложении columns, без повторного указания выражения в предложении ORDER BY или GROUP BY
-# и вместо этого использования имени столбца или помеченного имени из предложения COLUMNS.
-# Эта форма доступна путем передачи строкового текста имени в метод Select.order_by() or Select.group_by().
-# Переданный текст не отображается напрямую; вместо этого имя, данное выражению в предложении columns,
-# отображается как имя этого выражения в контексте, вызывая ошибку, если совпадение не найдено.
-# Унарные модификаторы asc() and desc() также могут использоваться в этой форме:
+# Теперь, когда мы выбираем из нескольких таблиц и используем соединения, мы быстро сталкиваемся со случаем,
+# когда нам нужно ссылаться на одну и ту же таблицу несколько раз в предложении FROM оператора.
+# Мы делаем это с помощью псевдонимов SQL , которые представляют собой синтаксис, предоставляющий
+# альтернативное имя таблице или подзапросу, из которого на него можно ссылаться в операторе.
+#
+# В языке выражений SQLAlchemy эти «имена» представлены FromClause объектами, известными как Alias,
+# которые создаются в Core с помощью FromClause.alias() метода. Alias похож на Table тем,
+# что у него также есть пространство имен Column объектов в Alias.c.collection.
+# Например, оператор SELECT ниже возвращает все уникальные пары имен пользователей:
 
-stmt = (
-    select(Address.user_id, func.count(Address.id).label("num_addresses"))
-    .group_by("user_id")
-    .order_by("user_id", desc("num_addresses"))
+user_alias_1 = user_table.alias()
+user_alias_2 = user_table.alias()
+print(
+    select(user_alias_1.c.name, user_alias_2.c.name).join_from(
+        user_alias_1, user_alias_2, user_alias_1.c.id > user_alias_2.c.id
+    )
 )
-print(stmt)
