@@ -1,33 +1,41 @@
-from sqlalchemy import select, func
-
-from core_models import address_table, user_table
-from database import get_db_engine
-
-engine = get_db_engine()
+from sqlalchemy import select
+from sqlalchemy.orm import aliased
+from database import get_db_session
+from orm_models import Address, User
 
 
-# Использование конструкции CTE в SQLAlchemy практически тоже самое что и использование конструкции Subquery.
-# Изменив вызов метода Select.subquery(), чтобы использовать Select.cte() вместо этого, мы можем использовать
-# полученный объект как элемент FROM таким же образом, но отображаемый SQL — это совсем другой синтаксис.
-# общего табличного выражения:
-
-subq = (
-    select(func.count(address_table.c.id).label("count"), address_table.c.user_id)
-    .group_by(address_table.c.user_id)
-    .cte()
-)
-
-stmt = select(user_table.c.name, user_table.c.fullname, subq.c.count).join_from(
-    user_table, subq
-)
-
-print(stmt)
-
-# Конструкция CTE также может использоваться в «рекурсивном» стиле и в более сложных случаях может быть составлена
-# из предложения RETURNING оператора INSERT, UPDATE или DELETE. Строка документации для CTE включает подробности об
-# этих дополнительных шаблонах.
+# В ORM aliased() конструкция может использоваться для связывания сущности ORM, такой как наш User или Address класс,
+# с любой FromClause концепцией, которая представляет источник строк. Предыдущий раздел Псевдонимы сущностей ORM
+# иллюстрирует использование aliased() для связывания сопоставленного класса с Alias его сопоставленным Table.
+# Здесь мы иллюстрируем aliased() выполнение того же действия как против , Subquery так и CTE против
+# сгенерированного против Select конструкции, которая в конечном итоге выводится из того же сопоставленного Table.
 #
-# В обоих случаях Subquery и CTE были названы на уровне SQL с использованием «анонимного» имени.
-# В коде Python нам вообще не нужно предоставлять эти имена. Идентификатор объекта экземпляров Subquery or CTE
-# служит синтаксическим идентификатором объекта при рендеринге. Имя, которое будет отображено в SQL, можно предоставить,
-# передав его в качестве первого аргумента методов Select.subquery() or Select.cte().
+# Ниже приведен пример применения aliased() к Subquery конструкции, чтобы сущности ORM могли быть извлечены из ее строк.
+# Результат показывает ряд объектов User и Address, где данные для каждого Address объекта в конечном итоге были
+# получены из подзапроса к address таблице, а не из этой таблицы напрямую:
+
+subq = select(Address).where(~Address.email_address.like("%@aol.com")).subquery()
+address_subq = aliased(Address, subq)
+stmt = (
+    select(User, address_subq)
+    .join_from(User, address_subq)
+    .order_by(User.id, address_subq.id)
+)
+with get_db_session() as session:
+    for user, address in session.execute(stmt):
+        print(f"{user} {address}")
+
+print("-" * 60)
+# Далее следует еще один пример, который абсолютно такой же, за исключением того,
+# что вместо этого используется конструкция CTE:
+
+cte_obj = select(Address).where(~Address.email_address.like("%@aol.com")).cte()
+address_cte = aliased(Address, cte_obj)
+stmt = (
+    select(User, address_cte)
+    .join_from(User, address_cte)
+    .order_by(User.id, address_cte.id)
+)
+with get_db_session() as session:
+    for user, address in session.execute(stmt):
+        print(f"{user} {address}")
