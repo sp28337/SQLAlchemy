@@ -1,24 +1,29 @@
-from sqlalchemy import JSON, select
-from sqlalchemy import type_coerce
-from sqlalchemy.dialects import mysql
-import json
+from sqlalchemy import update, delete
 
-# Иногда необходимо, чтобы SQLAlchemy знал тип данных выражения, по всем указанным выше причинам, но не отображал
-# само выражение CAST на стороне SQL, где оно может помешать операции SQL, которая уже работает без него.
-# Для этого довольно распространенного варианта использования есть другая функция, type_coerce() которая тесно
-# связана с cast(), в том смысле, что она устанавливает выражение Python как имеющее определенный тип базы данных SQL,
-# но не отображает CAST ключевое слово или тип данных на стороне базы данных. type_coerce() особенно важно при
-# работе с JSON типом данных, который обычно имеет сложную связь со строковыми типами данных на разных платформах и
-# может даже не быть явным типом данных, например, на SQLite и MariaDB. Ниже мы используем type_coerce() для передачи
-# структуры Python в виде строки JSON в одну из функций JSON MySQL:
+from core_models import user_table
+from database import get_db_engine
 
-from sqlalchemy import JSON
-from sqlalchemy import type_coerce
-from sqlalchemy.dialects import mysql
-s = select(type_coerce({"some_key": {"foo": "bar"}}, JSON)["some_key"])
-print(s.compile(dialect=mysql.dialect()))
+engine = get_db_engine()
 
-# JSON_EXTRACT Выше была вызвана функция SQL MySQL, поскольку мы использовали type_coerce() ее для указания того,
-# что наш словарь Python следует рассматривать как JSON. В этом случае __getitem__ оператор Python ['some_key']
-# стал доступен в результате и позволил отобразить JSON_EXTRACT выражение пути
-# (не показано, однако в этом случае это в конечном итоге будет '$."some_key"').
+# Как и Insert конструкция, Updateа Delete также поддерживают предложение RETURNING, которое добавляется с помощью
+# методов Update.returning() и Delete.returning(). Когда эти методы используются на бэкэнде, поддерживающем RETURNING,
+# выбранные столбцы из всех строк, которые соответствуют критериям WHERE оператора,
+# будут возвращены в Result объекте как строки, которые можно итерировать:
+
+update_stmt = (
+    update(user_table)
+    .where(user_table.c.name == "patrick")
+    .values(fullname="Patrick the Star")
+    .returning(user_table.c.id, user_table.c.name)
+)
+
+print(update_stmt)
+
+
+delete_stmt = (
+    delete(user_table)
+    .where(user_table.c.name == "patrick")
+    .returning(user_table.c.id, user_table.c.name)
+)
+
+print(delete_stmt)
