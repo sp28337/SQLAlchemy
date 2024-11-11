@@ -1,26 +1,24 @@
-from sqlalchemy import select, cast, String, JSON
+from sqlalchemy import JSON, select
+from sqlalchemy import type_coerce
+from sqlalchemy.dialects import mysql
+import json
 
-from core_models import user_table
-from database import get_db_engine
+# Иногда необходимо, чтобы SQLAlchemy знал тип данных выражения, по всем указанным выше причинам, но не отображал
+# само выражение CAST на стороне SQL, где оно может помешать операции SQL, которая уже работает без него.
+# Для этого довольно распространенного варианта использования есть другая функция, type_coerce() которая тесно
+# связана с cast(), в том смысле, что она устанавливает выражение Python как имеющее определенный тип базы данных SQL,
+# но не отображает CAST ключевое слово или тип данных на стороне базы данных. type_coerce() особенно важно при
+# работе с JSON типом данных, который обычно имеет сложную связь со строковыми типами данных на разных платформах и
+# может даже не быть явным типом данных, например, на SQLite и MariaDB. Ниже мы используем type_coerce() для передачи
+# структуры Python в виде строки JSON в одну из функций JSON MySQL:
 
-engine = get_db_engine()
+from sqlalchemy import JSON
+from sqlalchemy import type_coerce
+from sqlalchemy.dialects import mysql
+s = select(type_coerce({"some_key": {"foo": "bar"}}, JSON)["some_key"])
+print(s.compile(dialect=mysql.dialect()))
 
-# В SQL нам часто требуется явно указать тип данных выражения, либо чтобы сообщить базе данных,
-# какой тип ожидается в иначе неоднозначном выражении, либо в некоторых случаях, когда мы хотим преобразовать
-# подразумеваемый тип данных выражения SQL во что-то другое. Для этой задачи используется ключевое слово SQL CAST,
-# которое в SQLAlchemy предоставляется функцией cast(). Эта функция принимает выражение столбца и объект типа
-# данных в качестве аргументов, как показано ниже, где мы создаем выражение SQL из объекта столбца
-# :CAST(user_account.id AS VARCHAR)user_table.c.id
-
-stmt = select(cast(user_table.c.id, String))
-with engine.connect() as conn:
-    result = conn.execute(stmt)
-    print(result.all())
-
-print("-" * 60)
-# Функция cast() не только отображает синтаксис SQL CAST, она также создает выражение столбца SQLAlchemy,
-# которое будет действовать как заданный тип данных на стороне Python. Строковое выражение, которое должно cast()
-# получить JSON индекс JSON и операторы сравнения, например:
-
-print(cast("{'a': 'b'}", JSON)["a"])
-
+# JSON_EXTRACT Выше была вызвана функция SQL MySQL, поскольку мы использовали type_coerce() ее для указания того,
+# что наш словарь Python следует рассматривать как JSON. В этом случае __getitem__ оператор Python ['some_key']
+# стал доступен в результате и позволил отобразить JSON_EXTRACT выражение пути
+# (не показано, однако в этом случае это в конечном итоге будет '$."some_key"').
