@@ -5,32 +5,27 @@ from database import get_db_engine
 
 engine = get_db_engine()
 
-# Ключевое слово SQL EXISTS — это оператор, который используется со скалярными подзапросами для возврата
-# логического значения true или false в зависимости от того, вернет ли оператор SELECT строку.
-# SQLAlchemy включает вариант объекта, ScalarSelect называемый Exists, который будет генерировать
-# подзапрос EXISTS и наиболее удобно генерируется с помощью SelectBase.exists() метода.
-# Ниже мы создаем EXISTS, чтобы мы могли возвращать user_account строки, которые имеют более одной связанной
-# строки в address:
+# функция count(), агрегатная функция, которая подсчитывает количество возвращаемых строк:
 
-subq = (
-    select(func.count(address_table.c.id))
-    .where(user_table.c.id == address_table.c.user_id)
-    .group_by(address_table.c.user_id)
-    .having(func.count(address_table.c.id) > 1)
-).exists()
-with engine.connect() as conn:
-    result = conn.execute(select(user_table.c.name).where(subq))
-    print(result.all())
+print(select(func.count()).select_from(user_table))
 
 print("-" * 60)
-# Конструкция EXISTS чаще всего используется как отрицание, например NOT EXISTS, поскольку она обеспечивает
-# SQL-эффективную форму поиска строк, для которых в связанной таблице нет строк. Ниже мы выбираем имена пользователей,
-# у которых нет адресов электронной почты; обратите внимание на бинарный оператор отрицания ( ~), используемый внутри
-# второго предложения WHERE:
+# функция lower(), строковая функция, преобразующая строку в нижний регистр:
 
-subq = (
-    select(address_table.c.id).where(user_table.c.id == address_table.c.user_id)
-).exists()
+print(select(func.lower("A String With Much UPPERCASE")))
+
+print("." * 60)
+# функция now(), которая предоставляет текущую дату и время; поскольку это общая функция, SQLAlchemy знает,
+# как отображать ее по-разному для каждого бэкэнда, в случае SQLite используется функция CURRENT_TIMESTAMP:
+
+stmt = select(func.now())
 with engine.connect() as conn:
-    result = conn.execute(select(user_table.c.name).where(~subq))
+    result = conn.execute(stmt)
     print(result.all())
+
+print("_" * 60)
+# Поскольку большинство бэкендов баз данных содержат десятки, если не сотни различных функций SQL, func
+# старается быть максимально либеральным в том, что он принимает. Любое имя, к которому осуществляется доступ
+# из этого пространства имен, автоматически считается функцией SQL, которая будет отображаться в общем виде:
+
+print(select(func.some_crazy_function(user_table.c.name, 17)))
