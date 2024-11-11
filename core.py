@@ -5,27 +5,40 @@ from database import get_db_engine
 
 engine = get_db_engine()
 
-# функция count(), агрегатная функция, которая подсчитывает количество возвращаемых строк:
+# Распространенной функцией, используемой с оконными функциями, является row_number() функция,
+# которая просто подсчитывает строки. Мы можем разделить это количество строк на имя пользователя,
+# чтобы подсчитать адреса электронной почты отдельных пользователей:
 
-print(select(func.count()).select_from(user_table))
-
+stmt = (
+    select(
+        func.row_number().over(partition_by=user_table.c.name),
+        user_table.c.name,
+        address_table.c.email_address,
+    )
+    .select_from(user_table)
+    .join(address_table)
+)
+print(stmt)
 print("-" * 60)
-# функция lower(), строковая функция, преобразующая строку в нижний регистр:
 
-print(select(func.lower("A String With Much UPPERCASE")))
-
-print("." * 60)
-# функция now(), которая предоставляет текущую дату и время; поскольку это общая функция, SQLAlchemy знает,
-# как отображать ее по-разному для каждого бэкэнда, в случае SQLite используется функция CURRENT_TIMESTAMP:
-
-stmt = select(func.now())
 with engine.connect() as conn:
     result = conn.execute(stmt)
     print(result.all())
 
-print("_" * 60)
-# Поскольку большинство бэкендов баз данных содержат десятки, если не сотни различных функций SQL, func
-# старается быть максимально либеральным в том, что он принимает. Любое имя, к которому осуществляется доступ
-# из этого пространства имен, автоматически считается функцией SQL, которая будет отображаться в общем виде:
+# Выше FunctionElement.over.partition_by параметр используется для того, чтобы предложение было отображено внутри
+# предложения OVER. Мы также можем использовать предложение,
+# используя :PARTITION BY ORDER BY FunctionElement.over.order_by
+print("-" * 60)
 
-print(select(func.some_crazy_function(user_table.c.name, 17)))
+stmt = (
+    select(
+        func.count().over(order_by=user_table.c.name),
+        user_table.c.name,
+        address_table.c.email_address,
+    )
+    .select_from(user_table)
+    .join(address_table)
+)
+with engine.connect() as conn:
+    result = conn.execute(stmt)
+    print(result.all())
