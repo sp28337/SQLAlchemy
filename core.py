@@ -1,15 +1,18 @@
-from sqlalchemy import delete
-from sqlalchemy.dialects import mysql
+from sqlalchemy import update
 
-from core_models import user_table, address_table
+from core_models import user_table
+from database import get_db_engine
 
-# Как и Update, Delete поддерживает использование коррелированных подзапросов в предложении WHERE,
-# а также специфичные для бэкэнда многотабличные синтаксисы, например, в MySQL:DELETE FROM..USING
+engine = get_db_engine()
 
-delete_stmt = (
-    delete(user_table)
-    .where(user_table.c.id == address_table.c.user_id)
-    .where(address_table.c.email_address == "patrick@aol.com")
-)
+# Оба Update и Delete поддерживают возможность возвращать количество сопоставленных строк после выполнения оператора
+# для операторов, которые вызываются с помощью Core Connection, т. е Connection.execute(). Согласно указанным ниже
+# предостережениям, это значение доступно из CursorResult.rowcount атрибута:
 
-print(delete_stmt.compile(dialect=mysql.dialect()))
+with engine.begin() as conn:
+    result = conn.execute(
+        update(user_table)
+        .values(fullname="Patrick McStar")
+        .where(user_table.c.name == "patrick")
+    )
+    print(result.rowcount)
