@@ -1,24 +1,45 @@
-from sqlalchemy import JSON, select
-from sqlalchemy import type_coerce
-from sqlalchemy.dialects import mysql
-import json
+from sqlalchemy import update, bindparam
 
-# Иногда необходимо, чтобы SQLAlchemy знал тип данных выражения, по всем указанным выше причинам, но не отображал
-# само выражение CAST на стороне SQL, где оно может помешать операции SQL, которая уже работает без него.
-# Для этого довольно распространенного варианта использования есть другая функция, type_coerce() которая тесно
-# связана с cast(), в том смысле, что она устанавливает выражение Python как имеющее определенный тип базы данных SQL,
-# но не отображает CAST ключевое слово или тип данных на стороне базы данных. type_coerce() особенно важно при
-# работе с JSON типом данных, который обычно имеет сложную связь со строковыми типами данных на разных платформах и
-# может даже не быть явным типом данных, например, на SQLite и MariaDB. Ниже мы используем type_coerce() для передачи
-# структуры Python в виде строки JSON в одну из функций JSON MySQL:
+from core_models import user_table
+from database import get_db_engine
 
-from sqlalchemy import JSON
-from sqlalchemy import type_coerce
-from sqlalchemy.dialects import mysql
-s = select(type_coerce({"some_key": {"foo": "bar"}}, JSON)["some_key"])
-print(s.compile(dialect=mysql.dialect()))
+engine = get_db_engine()
 
-# JSON_EXTRACT Выше была вызвана функция SQL MySQL, поскольку мы использовали type_coerce() ее для указания того,
-# что наш словарь Python следует рассматривать как JSON. В этом случае __getitem__ оператор Python ['some_key']
-# стал доступен в результате и позволил отобразить JSON_EXTRACT выражение пути
-# (не показано, однако в этом случае это в конечном итоге будет '$."some_key"').
+
+# Базовое ОБНОВЛЕНИЕ выглядит так:
+
+stmt = (
+    update(user_table)
+    .where(user_table.c.name == "patrick")
+    .values(fullname="Patrick the Star")
+)
+print(stmt)
+
+# Метод Update.values() управляет содержимым элементов SET оператора UPDATE. Это тот же метод, который используется
+# конструкцией Insert. Параметры обычно можно передавать с использованием имен столбцов в качестве ключевых аргументов.
+print("-" * 60)
+# UPDATE поддерживает все основные формы SQL UPDATE, включая обновления по выражениям,
+# где мы можем использовать Column выражения:
+
+stmt = update(user_table).values(fullname="Username: " + user_table.c.name)
+print(stmt)
+
+print("-" * 60)
+# Для поддержки UPDATE в контексте «executemany», где для одного и того же оператора будет вызываться множество
+# наборов параметров, bindparam() можно использовать конструкцию для настройки связанных параметров;
+# они заменяют места, где обычно располагаются литеральные значения:
+
+stmt = (
+    update(user_table)
+    .where(user_table.c.name == bindparam("oldname"))
+    .values(name=bindparam("newname"))
+)
+with engine.begin() as conn:
+    conn.execute(
+        stmt,
+        [
+            {"oldname": "jack", "newname": "ed"},
+            {"oldname": "wendy", "newname": "mary"},
+            {"oldname": "jim", "newname": "jake"},
+        ],
+    )

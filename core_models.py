@@ -16,7 +16,7 @@ from sqlalchemy import Table, Column, Integer, String, ForeignKey
 from database import get_db_engine
 from database import Base
 
-user_table = Table(
+user_table: Table = Table(
     "user_account",
     Base.metadata,
     Column("id", Integer, primary_key=True),
